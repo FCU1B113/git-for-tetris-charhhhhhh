@@ -125,6 +125,9 @@ void resetBlock(Block *block) {
 }
 
 void printCanvas(Block canvas[CANVAS_HEIGHT][CANVAS_WIDTH], State *state) {
+    // 顯示分數
+    printf("\033[%d;%dHScore: %d", 2, CANVAS_WIDTH * 2 + 5, state->score);
+
     printf("\033[0;0H\n");
     for (int i = 0; i < CANVAS_HEIGHT; i++) {
         printf("|");
