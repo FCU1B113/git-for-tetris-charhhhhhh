@@ -24,6 +24,8 @@
 #define DOWN_FUNC() GetAsyncKeyState(DOWN_KEY) & 0x8000
 #define FALL_FUNC() GetAsyncKeyState(FALL_KEY) & 0x8000
 
+int vis[7] = {};
+
 typedef enum {
     RED = 41,
     GREEN,
@@ -111,6 +113,25 @@ Shape shapes[7] = {
                  {{0, 0, 0}, {1, 1, 0}, {0, 1, 1}},
                  {{0, 1, 0}, {1, 1, 0}, {1, 0, 0}}}},
 };
+
+int findnxt() {
+    int all = 1;
+    for (int i = 0; i < 7; i++) {
+        if (!vis[i])
+            all = 0;
+    }
+    if (all) {
+        for (int i = 0; i < 7; i++)
+            vis[i] = 0;
+    }
+    int nxt;
+    do {
+        nxt = rand() % 7;
+    } while (vis[nxt]);
+    vis[nxt] = 1;
+
+    return nxt;
+}
 
 void setBlock(Block *block, Color color, ShapeId shape, bool current) {
     block->color = color;
@@ -203,6 +224,58 @@ bool move(Block canvas[CANVAS_HEIGHT][CANVAS_WIDTH], int originalX,
     return true;
 }
 
+// ======================= 特效區塊 START ========================
+typedef struct {
+    int x, y;
+    int color;
+    int lifetime;
+} Particle;
+
+#define MAX_PARTICLES 100
+static Particle particles[MAX_PARTICLES] = {0};
+
+void flashLineEffect(Block canvas[CANVAS_HEIGHT][CANVAS_WIDTH], int row) {
+    for (int c = 0; c < 3; c++) {
+        for (int j = 0; j < CANVAS_WIDTH; j++) {
+            printf("\033[%d;%dH\033[7m  \033[0m", row + 1, j * 2 + 1);
+        }
+        Sleep(45);
+        for (int j = 0; j < CANVAS_WIDTH; j++) {
+            printf("\033[%d;%dH\033[%dm  ", row + 1, j * 2 + 1,
+                   canvas[row][j].color);
+        }
+        Sleep(45);
+    }
+}
+
+void spawnParticles(int x, int y, int color) {
+    for (int i = 0; i < MAX_PARTICLES; i++) {
+        if (particles[i].lifetime <= 0) {
+            particles[i].x = x;
+            particles[i].y = y;
+            particles[i].color = color;
+            particles[i].lifetime = rand() % 4 + 4;
+            break;
+        }
+    }
+}
+
+void updateEffects() {
+    for (int i = 0; i < MAX_PARTICLES; i++) {
+        if (particles[i].lifetime > 0) {
+            // 清除前一幀
+            printf("\033[%d;%dH  ", particles[i].y + 1, particles[i].x * 2 + 1);
+            particles[i].y++;
+            particles[i].lifetime--;
+            if (particles[i].lifetime > 0 && particles[i].y < CANVAS_HEIGHT) {
+                printf("\033[%d;%dH\033[%dm..\033[0m", particles[i].y + 1,
+                       particles[i].x * 2 + 1, particles[i].color);
+            }
+        }
+    }
+}
+// ======================= 特效區塊 END ========================
+
 int clearLine(Block canvas[CANVAS_HEIGHT][CANVAS_WIDTH]) {
     for (int i = 0; i < CANVAS_HEIGHT; i++) {
         for (int j = 0; j < CANVAS_WIDTH; j++) {
@@ -222,6 +295,10 @@ int clearLine(Block canvas[CANVAS_HEIGHT][CANVAS_WIDTH]) {
             }
         }
         if (isFull) {
+            flashLineEffect(canvas, i); // 消行閃爍特效
+            for (int j = 0; j < CANVAS_WIDTH; j++) {
+                spawnParticles(j, i, canvas[i][j - 1].color); // 粒子特效
+            }
             linesCleared += 1;
 
             for (int j = i; j > 0; j--) {
@@ -268,6 +345,16 @@ void logic(Block canvas[CANVAS_HEIGHT][CANVAS_WIDTH], State *state) {
                  state->y + 1, state->rotate, state->queue[0])) {
             state->y++;
         } else {
+            // 方塊落地時產生粒子
+            Shape shapeData = shapes[state->queue[0]];
+            for (int i = 0; i < shapeData.size; i++) {
+                for (int j = 0; j < shapeData.size; j++) {
+                    if (shapeData.rotates[state->rotate][i][j]) {
+                        spawnParticles(state->x + j, state->y + i,
+                                       shapeData.color);
+                    }
+                }
+            }
             state->score += clearLine(canvas);
 
             state->x = CANVAS_WIDTH / 2;
@@ -277,7 +364,7 @@ void logic(Block canvas[CANVAS_HEIGHT][CANVAS_WIDTH], State *state) {
             state->queue[0] = state->queue[1];
             state->queue[1] = state->queue[2];
             state->queue[2] = state->queue[3];
-            state->queue[3] = rand() % 7;
+            state->queue[3] = findnxt(); // 使用findnxt確保7種隨機巡迴
 
             // 結束輸出
             if (!move(canvas, state->x, state->y, state->rotate, state->x,
@@ -298,7 +385,7 @@ int main() {
         .x = CANVAS_WIDTH / 2, .y = 0, .score = 0, .rotate = 0, .fallTime = 0};
 
     for (int i = 0; i < 4; i++) {
-        state.queue[i] = rand() % 7;
+        state.queue[i] = findnxt();
     }
 
     Block canvas[CANVAS_HEIGHT][CANVAS_WIDTH];
@@ -322,6 +409,7 @@ int main() {
     while (1) {
         printCanvas(canvas, &state);
         logic(canvas, &state);
+        updateEffects();
         Sleep(100);
     }
 
