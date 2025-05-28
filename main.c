@@ -129,8 +129,6 @@ int findnxt() {
         nxt = rand() % 7;
     } while (vis[nxt]);
     vis[nxt] = 1;
-
-    return nxt;
 }
 
 void setBlock(Block *block, Color color, ShapeId shape, bool current) {
@@ -297,7 +295,7 @@ int clearLine(Block canvas[CANVAS_HEIGHT][CANVAS_WIDTH]) {
         if (isFull) {
             flashLineEffect(canvas, i); // 消行閃爍特效
             for (int j = 0; j < CANVAS_WIDTH; j++) {
-                spawnParticles(j, i, canvas[i][j - 1].color); // 粒子特效
+                spawnParticles(j, i, canvas[i][j].color); // 粒子特效
             }
             linesCleared += 1;
 
@@ -364,7 +362,8 @@ void logic(Block canvas[CANVAS_HEIGHT][CANVAS_WIDTH], State *state) {
             state->queue[0] = state->queue[1];
             state->queue[1] = state->queue[2];
             state->queue[2] = state->queue[3];
-            state->queue[3] = findnxt(); // 使用findnxt確保7種隨機巡迴
+
+            state->queue[3] = findnxt();
 
             // 結束輸出
             if (!move(canvas, state->x, state->y, state->rotate, state->x,
@@ -409,7 +408,7 @@ int main() {
     while (1) {
         printCanvas(canvas, &state);
         logic(canvas, &state);
-        updateEffects();
+        updateEffects(); // 新增：更新並顯示粒子特效
         Sleep(100);
     }
 
