@@ -293,9 +293,18 @@ int clearLine(Block canvas[CANVAS_HEIGHT][CANVAS_WIDTH]) {
             }
         }
         if (isFull) {
+            // 先記錄顏色，避免下移後顏色被覆蓋
+            Color lineColors[CANVAS_WIDTH];
+            for (int j = 0; j < CANVAS_WIDTH; j++) {
+                lineColors[j] = canvas[i][j].color;
+            }
             flashLineEffect(canvas, i); // 消行閃爍特效
             for (int j = 0; j < CANVAS_WIDTH; j++) {
-                spawnParticles(j, i, canvas[i][j].color); // 粒子特效
+                // 粒子特效往下一行
+                if (i - 1 > 0)
+                    spawnParticles(j, i - 1, lineColors[j]);
+                else
+                    spawnParticles(j, i, lineColors[j]);
             }
             linesCleared += 1;
 
